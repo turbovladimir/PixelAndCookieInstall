@@ -1,2 +1,2 @@
-# Example of instalation pixel and handl partner cookies
+# Example of instalation pixel and handle partner cookies
 Using php and js
