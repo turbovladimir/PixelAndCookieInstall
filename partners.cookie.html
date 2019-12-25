@@ -1,0 +1,134 @@
+<script type="text/javascript">
+	/*
+	 * Make sure this code is included at any page of your site before any output is started.
+	 * The good way is to place it in the beginning of your index.php
+	 */
+
+	var settingsByPartner = {
+		cityads: {
+			pixelUrl: 'https://hskwq.com/service/newtrack/{orderId}/ct/{targetCode}/c/{campaignId}?click_id={clickId}'
+		}/*,
+		anotherCPA: {
+			pixelUrl: 'anotherUrl'
+		}
+		*/
+	};
+
+	function CPACounter(settingsByPartner) {
+		if (settingsByPartner && !CPACounter.settingsByPartner) {
+			CPACounter.settingsByPartner = settingsByPartner;
+			return;
+		} else if (CPACounter.settingsByPartner && !settingsByPartner) {
+			return;
+		}
+
+		throw new Error('CPACounter should be first instantiated with `settingsByPartner` argument, then it must be used with no arguments.');
+	}
+
+	CPACounter.prototype.setPartnersCookies = function (expirationDays) {
+		var queryParams = this.parseQueryParams(window.location.search);
+
+		if (!queryParams.utm_source) {
+			return;
+		}
+
+		for (var partnerName in CPACounter.settingsByPartner) {
+			if (CPACounter.settingsByPartner.hasOwnProperty(partnerName)) {
+				if (queryParams.utm_source === partnerName) {
+					var expirationDate = new Date();
+					expirationDate.setDate(expirationDate.getDate() + expirationDays);
+					this.setCookie(partnerName + 'ClickId', queryParams.utm_source || '', expirationDate, '/');
+				}
+			}
+		}
+	};
+
+	CPACounter.prototype.getPixelUrls = function (orderId, targetCode, partnerNames) {
+		if (!partnerNames) {
+			partnerNames = Object.keys(CPACounter.settingsByPartner);
+		}
+
+		var urls = [];
+
+		for (var i = 0; i < partnerNames.length; i++) {
+			var partnerName = partnerNames[i],
+				clickId = this.getCookie(partnerName + 'ClickId');
+
+			if (!clickId) {
+				continue;
+			}
+
+			urls.push(this.formatString(CPACounter.settingsByPartner[partnerName].pixelUrl, {
+				orderId: encodeURIComponent(orderId),
+				targetCode: targetCode,
+				campaignId: campaignId,
+				clickId: clickId,
+			}));
+		}
+
+		return urls;
+	};
+
+	CPACounter.prototype.insertPixels = function (orderId, targetCode, partnerNames) {
+		var urls = this.getPixelUrls(orderId, targetCode, partnerNames);
+
+		for (var i = 0; i < urls.length; i++) {
+			var url = urls[i];
+			var img = document.createElement('img');
+			img.style.display = 'none';
+			img.src = url;
+			document.body.appendChild(img);
+		}
+	};
+
+	CPACounter.prototype.setCookie = function (name, value, expires, path) {
+		document.cookie = encodeURIComponent(name) + '=' + encodeURIComponent(value) + '; path=' + path + '; expires=' + expires.toUTCString();
+	};
+
+	CPACounter.prototype.getCookie = function (name) {
+		let matches = document.cookie.match(new RegExp(
+			"(?:^|; )" + name.replace(/([\.$?*|{}\(\)\[\]\\\/\+^])/g, '\\$1') + "=([^;]*)"
+		));
+		return matches ? decodeURIComponent(matches[1]) : undefined;
+	};
+
+	CPACounter.prototype.formatString = function (string, data) {
+		return string.replace(/\{\s*(.*?)\s*\}/g, (i, match) => data.hasOwnProperty(match) ? data[match] : '');
+	};
+
+	CPACounter.prototype.parseQueryParams = (function () {
+		var re = /([^&=]+)=?([^&]*)/g;
+		var decodeRE = /\+/g;  // Regex for replacing addition symbol with a space
+		var decode = function (str) { return decodeURIComponent( str.replace(decodeRE, " ") ); };
+
+		return function (query) {
+			var params = {}, e;
+
+			while (e = re.exec(query)) { 
+				var k = decode( e[1] ), v = decode( e[2] );
+
+				if (k.substring(k.length - 2) === '[]') {
+					k = k.substring(0, k.length - 2);
+					(params[k] || (params[k] = [])).push(v);
+				} else {
+					params[k] = v;
+				}
+			}
+
+			return params;
+		};
+	})();
+
+	var cpaCounter = new CPACounter(settingsByPartner);
+
+	cpaCounter.setPartnersCookies();
+</script>
+
+<script type="text/javascript">
+	/*
+	 * Place this code after the order is successfully done
+	 */
+	var cpaCounter = new CPACounter(); // $orderId is an ID of the order in your system. Contact integration team to talk about $targetCode
+
+	cpaCounter.insertPixels('orderId', 'targetCode');
+</script>
